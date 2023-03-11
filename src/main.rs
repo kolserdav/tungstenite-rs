@@ -1,6 +1,8 @@
 use std::{net::TcpListener, thread::spawn};
 use tungstenite::{connect, Message};
 use url::Url;
+#[macro_use]
+extern crate log;
 
 use tungstenite::{
     accept_hdr,
@@ -8,6 +10,8 @@ use tungstenite::{
 };
 
 fn main() {
+    env_logger::init();
+
     spawn(|| {
         server();
     });
@@ -15,21 +19,19 @@ fn main() {
 }
 
 fn server() {
-    env_logger::init();
     let server = TcpListener::bind("127.0.0.1:3012").unwrap();
     for stream in server.incoming() {
         spawn(move || {
             let callback = |req: &Request, mut response: Response| {
-                println!("Received a new ws handshake");
-                println!("The request's path is: {}", req.uri().path());
-                println!("The request's headers are:");
+                debug!("Received a new ws handshake");
+                debug!("The request's path is: {}", req.uri().path());
+                debug!("The request's headers are:");
                 for (ref header, _value) in req.headers() {
-                    println!("* {}: {:?}", header, _value);
+                    debug!("* {}: {:?}", header, _value);
                 }
 
                 let headers = response.headers_mut();
                 headers.append("MyCustomHeader", ":)".parse().unwrap());
-                headers.append("SOME_TUNGSTENITE_HEADER", "header_value".parse().unwrap());
 
                 Ok(response)
             };
@@ -48,12 +50,11 @@ fn server() {
 fn client() {
     let (mut socket, response) =
         connect(Url::parse("ws://localhost:3012/socket").unwrap()).expect("Can't connect");
-
-    println!("Connected to the server");
-    println!("Response HTTP code: {}", response.status());
-    println!("Response contains the following headers:");
+    debug!("Connected to the server");
+    debug!("Response HTTP code: {}", response.status());
+    debug!("Response contains the following headers:");
     for (ref header, _value) in response.headers() {
-        println!("* {}: {:?}", header, _value);
+        debug!("* {}: {:?}", header, _value);
     }
 
     socket
@@ -61,6 +62,6 @@ fn client() {
         .unwrap();
     loop {
         let msg = socket.read_message().expect("Error reading message");
-        println!("Received: {}", msg);
+        debug!("Received: {}", msg);
     }
 }

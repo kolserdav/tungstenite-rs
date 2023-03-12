@@ -3,14 +3,55 @@ use tungstenite::{connect, Message};
 use url::Url;
 #[macro_use]
 extern crate log;
+use tungstenite_rs::{make_answer, show_streams, AnswerFn, HelperAttr};
 
 use tungstenite::{
     accept_hdr,
     handshake::server::{Request, Response},
 };
 
+make_answer!();
+
+// Example: Basic function
+#[show_streams]
+fn invoke1() {}
+// out: attr: ""
+// out: item: "fn invoke1() { }"
+
+// Example: Attribute with input
+#[show_streams(bar)]
+fn invoke2() {}
+// out: attr: "bar"
+// out: item: "fn invoke2() {}"
+
+// Example: Multiple tokens in the input
+#[show_streams(multiple => tokens)]
+fn invoke3() {}
+// out: attr: "multiple => tokens"
+// out: item: "fn invoke3() {}"
+
+// Example:
+#[show_streams { delimiters }]
+fn invoke4() {}
+// out: attr: "delimiters"
+// out: item: "fn invoke4() {}"
+
+#[derive(AnswerFn)]
+struct Struct;
+
+#[derive(HelperAttr, Debug)]
+struct Struct1 {
+    #[helper]
+    field: (),
+}
+
 fn main() {
-    env_logger::init();
+    invoke2();
+    invoke3();
+    invoke4();
+    let st = Struct1 { field: () };
+    println!("{}:{}:{:?}", answer1(), answer2(), st,);
+    env_logger::builder().format_timestamp(None).init();
 
     spawn(|| {
         server();

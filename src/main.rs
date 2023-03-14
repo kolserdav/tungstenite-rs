@@ -9,6 +9,8 @@ use tungstenite::{
     accept_hdr,
     handshake::server::{Request, Response},
 };
+mod try_vec;
+use try_vec::try_vec;
 
 make_answer!();
 
@@ -46,6 +48,8 @@ struct Struct1 {
 }
 
 fn main() {
+    try_vec();
+
     invoke2();
     invoke3();
     invoke4();

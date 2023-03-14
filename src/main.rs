@@ -11,6 +11,8 @@ use tungstenite::{
 };
 mod try_vec;
 use try_vec::try_vec;
+mod try_async;
+use try_async::try_async;
 
 make_answer!();
 
@@ -49,6 +51,8 @@ struct Struct1 {
 
 fn main() {
     try_vec();
+
+    try_async();
 
     invoke2();
     invoke3();

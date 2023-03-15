@@ -1,3 +1,7 @@
-async fn fist() {}
+async fn first() {
+    println!("test");
+}
 
-pub async fn try_async() {}
+pub async fn try_async() {
+    first();
+}

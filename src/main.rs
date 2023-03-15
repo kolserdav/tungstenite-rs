@@ -1,98 +1,54 @@
-use std::{net::TcpListener, thread::spawn};
+use std::net::{TcpListener, TcpStream};
+use std::thread::spawn;
 use tungstenite::{connect, Message};
 use url::Url;
 #[macro_use]
 extern crate log;
-use tungstenite_rs::{make_answer, show_streams, AnswerFn, HelperAttr};
 
 use tungstenite::{
     accept_hdr,
     handshake::server::{Request, Response},
 };
-mod try_vec;
-use try_vec::try_vec;
-mod try_async;
-use try_async::try_async;
 
-make_answer!();
-
-// Example: Basic function
-#[show_streams]
-fn invoke1() {}
-// out: attr: ""
-// out: item: "fn invoke1() { }"
-
-// Example: Attribute with input
-#[show_streams(bar)]
-fn invoke2() {}
-// out: attr: "bar"
-// out: item: "fn invoke2() {}"
-
-// Example: Multiple tokens in the input
-#[show_streams(multiple => tokens)]
-fn invoke3() {}
-// out: attr: "multiple => tokens"
-// out: item: "fn invoke3() {}"
-
-// Example:
-#[show_streams { delimiters }]
-fn invoke4() {}
-// out: attr: "delimiters"
-// out: item: "fn invoke4() {}"
-
-#[derive(AnswerFn)]
-struct Struct;
-
-#[derive(HelperAttr, Debug)]
-struct Struct1 {
-    #[helper]
-    field: (),
-}
-
-fn main() {
-    try_vec();
-
-    try_async();
-
-    invoke2();
-    invoke3();
-    invoke4();
-    let st = Struct1 { field: () };
-    println!("{}:{}:{:?}", answer1(), answer2(), st,);
+#[tokio::main]
+async fn main() {
     env_logger::builder().format_timestamp(None).init();
 
-    spawn(|| {
-        server();
+    tokio::spawn(async move {
+        server().await;
     });
     client();
 }
 
-fn server() {
+async fn server() {
     let server = TcpListener::bind("127.0.0.1:3012").unwrap();
+
     for stream in server.incoming() {
-        spawn(move || {
-            let callback = |req: &Request, mut response: Response| {
-                debug!("Received a new ws handshake");
-                debug!("The request's path is: {}", req.uri().path());
-                debug!("The request's headers are:");
-                for (ref header, _value) in req.headers() {
-                    debug!("* {}: {:?}", header, _value);
-                }
+        tokio::spawn(accept_connection(stream.unwrap()));
+    }
+}
 
-                let headers = response.headers_mut();
-                headers.append("MyCustomHeader", ":)".parse().unwrap());
+async fn accept_connection(stream: TcpStream) {
+    let callback = |req: &Request, mut response: Response| {
+        debug!("Received a new ws handshake");
+        debug!("The request's path is: {}", req.uri().path());
+        debug!("The request's headers are:");
+        for (ref header, _value) in req.headers() {
+            debug!("* {}: {:?}", header, _value);
+        }
 
-                Ok(response)
-            };
-            let mut websocket = accept_hdr(stream.unwrap(), callback).unwrap();
+        let headers = response.headers_mut();
+        headers.append("MyCustomHeader", ":)".parse().unwrap());
 
-            loop {
-                let msg = websocket.read_message().unwrap();
-                if msg.is_binary() || msg.is_text() {
-                    websocket.write_message(msg).unwrap();
-                }
-            }
-        });
+        Ok(response)
+    };
+    let mut websocket = accept_hdr(stream, callback).unwrap();
+
+    loop {
+        let msg = websocket.read_message().unwrap();
+        if msg.is_binary() || msg.is_text() {
+            websocket.write_message(msg).unwrap();
+        }
     }
 }
 

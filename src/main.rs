@@ -1,14 +1,16 @@
-use std::net::{TcpListener, TcpStream};
-use std::thread::spawn;
-use tungstenite::{connect, Message};
+use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::{
+    accept_hdr_async,
+    tungstenite::{
+        connect,
+        handshake::server::{Request, Response},
+        Message,
+    },
+};
 use url::Url;
 #[macro_use]
 extern crate log;
-
-use tungstenite::{
-    accept_hdr,
-    handshake::server::{Request, Response},
-};
+use futures_util::{SinkExt, StreamExt};
 
 #[tokio::main]
 async fn main() {
@@ -21,10 +23,10 @@ async fn main() {
 }
 
 async fn server() {
-    let server = TcpListener::bind("127.0.0.1:3012").unwrap();
+    let server = TcpListener::bind("127.0.0.1:8080").await.unwrap();
 
-    for stream in server.incoming() {
-        tokio::spawn(accept_connection(stream.unwrap()));
+    while let Ok((stream, _)) = server.accept().await {
+        tokio::spawn(accept_connection(stream));
     }
 }
 
@@ -42,19 +44,22 @@ async fn accept_connection(stream: TcpStream) {
 
         Ok(response)
     };
-    let mut websocket = accept_hdr(stream, callback).unwrap();
+    let mut ws_stream = accept_hdr_async(stream, callback)
+        .await
+        .expect("Error during the websocket handshake occurred");
 
-    loop {
-        let msg = websocket.read_message().unwrap();
-        if msg.is_binary() || msg.is_text() {
-            websocket.write_message(msg).unwrap();
+    while let Some(msg) = ws_stream.next().await {
+        let msg = msg.unwrap();
+        if msg.is_text() || msg.is_binary() {
+            debug!("Server on message: {:?}", &msg);
+            ws_stream.send(msg).await.unwrap();
         }
     }
 }
 
 fn client() {
     let (mut socket, response) =
-        connect(Url::parse("ws://localhost:3012/socket").unwrap()).expect("Can't connect");
+        connect(Url::parse("ws://localhost:8080/socket").unwrap()).expect("Can't connect");
     debug!("Connected to the server");
     debug!("Response HTTP code: {}", response.status());
     debug!("Response contains the following headers:");
